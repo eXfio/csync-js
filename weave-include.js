@@ -20,6 +20,12 @@
  *  02111-1307 USA
  */
 
+/*
+ * This must be the first file to be included
+ * because it defines the global objects.
+ */
+var weave = {};
+
 weave.WeaveError = function(e) {
     if ( e instanceof Error ) {
         this.message = e.message;
@@ -29,3 +35,5 @@ weave.WeaveError = function(e) {
 }
 
 weave.WeaveError.prototype = new Error();
+
+module.exports = weave;

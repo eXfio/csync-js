@@ -20,37 +20,47 @@
  *  02111-1307 USA
  */
 
-requirejs.config({
-  baseUrl: 'jam'
-});
+//npm includes
+var sprintf = require('sprintf');
+var URI = require('URIjs');
 
-//jam inclues
-requirejs(['sprintf']);
+//app includes
+var weave = require('./weave-include');
+require('./weave-net');
+require('./weave-crypto');
+require('./weave-util');
 
-//app files
-requirejs(['./weave-crypto']);
-requirejs(['./weave-include']);
-requirejs(['./weave-util']);
+weave.client = {};
+
+weave.client.WeaveBasicObject = function() {  
+  this.id        = null;
+  this.modified  = null;
+  this.sortindex = null;
+  this.ttl       = null;
+  this.payload   = null;
+}
 
 weave.client.WeaveClient = function() {
+  var account       = null;
+  var storageClient = null;
+  var regClient     = null;
+  var privateKey    = null;
+  var bulkKeys      = null;
+}
 
-  var KEY_CRYPTO_PATH       = "crypto/keys";
-  var KEY_CRYPTO_COLLECTION = "crypto";
-  var KEY_CRYPTO_ID         = "keys";
-  var KEY_META_PATH         = "meta/global";
-  var KEY_META_COLLECTION   = "meta";
-  var KEY_META_ID           = "global";
+weave.client.WeaveClient.prototype = {
+
+  KEY_CRYPTO_PATH:       "crypto/keys",
+  KEY_CRYPTO_COLLECTION: "crypto",
+  KEY_CRYPTO_ID:         "keys",
+  KEY_META_PATH:         "meta/global",
+  KEY_META_COLLECTION:   "meta",
+  KEY_META_ID:           "global",
   
-  var account;
-  var storageClient;
-  var regClient;
-  var privateKey
-  var bulkKeys;
-
-  function init(baseURL, user, password, syncKey) {
+  init: function(baseURL, user, password, syncKey) {
 	this.privateKey      = null;
 	this.bulkKeys        = null;
-
+    
 	//Store account params
 	this.account = {};
 	this.account.baseURL  = baseURL;
@@ -63,18 +73,25 @@ weave.client.WeaveClient = function() {
 	this.regClient.init(baseURL, user, password);
 	this.storageClient = new weave.client.StorageApi();
 	this.storageClient.init(this.regClient.getStorageUrl(), user, password);
-  }
+  },
   
-  function decryptWeaveBasicObject(wbo, collection) {
+  decryptWeaveBasicObject: function(encWbo, collection) {
 	if ( !isEncrypted(wbo) ) {
 	  throw new weave.WeaveError("Weave Basic Object already decrypted");
 	}
     
-	var payload = decrypt(wbo.getPayload(), collection);
-	return new weave.client.WeaveBasicObject(wbo.getId(), wbo.getModified(), wbo.getSortindex(), wbo.getTtl(), payload);
-  }
+    var decWbo = new weave.client.WeaveBasicObject();
+    
+	decWbo.id         = encWbo.id
+	decWbo.modified   = encWbo.modified;
+	decWbo.sortindex  = encWbo.sortindex;
+	decWbo.payload    = decrypt(encWbo.getPayload(), collection);
+	decWbo.ttl        = encWbo.ttl;
+    
+    return decWbo;
+  },
   
-  function decrypt(payload, collection) {
+  decrypt: function(payload, collection) {
     
     var keyPair = new weave.crypto.WeaveKeyPair();
     
@@ -83,9 +100,9 @@ weave.client.WeaveClient = function() {
       
       try {
         keyPair = getPrivateKeyPair();
-      } catch(e){
-        throw new weave.WeaveError(e.message);
-      }
+        } catch(e){
+          throw new weave.WeaveError(e.message);
+        }
       
     } else {
       Weave.Log.info(sprintf("Decrypting data record using bulk key %s", collection));
@@ -96,8 +113,9 @@ weave.client.WeaveClient = function() {
     cipher = new weave.crypto.PayloadCipher();
     
     return cipher.decrypt(payload, keyPair);
-  }
-  
+  },
+    
+  /* asynchronous 
   function get(collection, id, decrypt, callback) {
     if (decrypt) {
 	  this.storageClient.get(collection, id, function(wbo) {callback(this.decryptWeaveBasicObject(wbo, collection));});
@@ -105,64 +123,71 @@ weave.client.WeaveClient = function() {
 	  this.storageClient.get(collection, id, callback);
     }
   }
-  
-}
+  */
+
+  get: function(collection, id, decrypt) {
+	var wbo = this.storageClient.get(collection, id);
+    
+    if (decrypt) {
+	  wbo = this.decryptWeaveBasicObject(wbo, collection);
+    }
+    return wbo;
+  },
+
+  getCollection: function(collection, decrypt) {
+	var wbos = this.storageClient.getCollection(collection, null, null, null, null, null, null, null, null, null);
+    
+    if (decrypt) {
+      var decWbos = [];
+      for (wbo in wbos) {
+	    decWbos.append(this.decryptWeaveBasicObject(wbo, collection));
+      }
+      wbos = decWbos;
+    }
+    return wbos;
+  }
+
+};
 
 weave.client.RegistrationApi = function() {
-  
   var baseURL  = null;
   var user     = null;
   var password = null;
-  
-  function init(baseURL, user, password) {
+};
+
+weave.client.RegistrationApi.prototype = {  
+
+  init: function(baseURL, user, password) {
     this.baseURL  = baseURL;
 	this.user     = user;
 	this.password = password;
-  }
+  },
   
-  function getStorageUrl() throws WeaveException {
+  getStorageUrl: function() {
       
-	storageURL = null;
-	
 	//TODO - confirm account exists, i.e. /user/1.0/USER returns 1
 		
-	var location = URI(sprintf("user/1.0/%s/node/weave", this.user)).relativeTo(baseURL);
+	var url = URI(sprintf("user/1.0/%s/node/weave", this.user)).absoluteTo(this.baseURL);
 
-	HttpGet get = new HttpGet(location);
-	CloseableHttpResponse response = null;
-
-		try {
-			response = httpClient.execute(get);
-			HttpClient.checkResponse(response);
-			
-			storageURL = new URI(EntityUtils.toString(response.getEntity()));
-
-		} catch (IOException e) {
-			throw new WeaveException(e);
-		} catch (HttpException e) {
-			throw new WeaveException(e);
-		} catch (URISyntaxException e) {
-			throw new WeaveException(e);
-		} finally {
-			HttpClient.closeResponse(response);
-		}
-		
-		return storageURL;
-	}
-}
+	return weave.net.Http.get(url, 2000);
+  }
+};
 
 weave.client.StorageApi = function() {
-
   var storageURL;
   var user;
   var password;
+};
 
-  function init(storageURL, user, password) {
+weave.client.StorageApi.prototype = {
+
+  init: function(storageURL, user, password) {
     this.storageURL = storageURL;
     this.user       = user;
     this.password   = password;
-  }
-  
+  },
+
+  /* asynchronous
   function get(collection, id, callback) {
 	weave.Log.debug("get()");
 	getPath(collection + "/" + id, callback);
@@ -192,16 +217,39 @@ weave.client.StorageApi = function() {
 
     callback(wbo);
   }
+  */
 
-  function getCollectionIds(collection, ids, older, newer, index_above, index_below, limit, offset, sort) {
-    
-  }
+  get: function(collection, id) {
+	weave.Log.debug("get()");
+	return getPath(collection + "/" + id);
+  },
+
+  getPath: function(path) {
+	weave.Log.debug("getPath()");
+
+    var url = URI(sprintf("1.1/%s/storage/%s", this.user, path)).relativeTo(this.storageURL);
+	var response = weave.net.Http.get(url, 2000);
+    var jsonObject = JSON.parse(response);
+
+    var wbo = new weave.client.WeaveBasicObject();
+	wbo.id         = jsonObject.id
+	wbo.modified   = jsonObject.modified;
+	wbo.sortindex  = jsonObject.sortindex;
+	wbo.payload    = jsonObject.payload;
+	wbo.ttl        = jsonObject.ttl;
+
+    return wbo;
+  },
   
-  function getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format) {
+  getCollectionIds: function(collection, ids, older, newer, index_above, index_below, limit, offset, sort) {
     
-  }
+  },
   
-  function getCollection(location) {
+  getCollection: function(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format) {
+    
+  },
+  
+  getCollectionPath: function(location) {
     
   }
-}
+};

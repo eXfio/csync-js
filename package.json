@@ -2,12 +2,12 @@
   "name": "weaveclient-js",
   "description": "Weave Client",
   "author": "Gerry <nickel_chrome@mac.com>",
-  "jam": {
-    "dependencies": {
-      "sprintf": ">= 0.6.0"
-      ,"URIjs": ">= 1.14.1"
-      ,"node-forge": "linked"
-    }
+  "dependencies": {
+    "node-getopt": "latest"
+    ,"node-forge": "latest"
+    ,"sprintf": "latest"
+    ,"URIjs": "latest"
+    ,"xmlhttprequest": "latest"
   },
   "engine": "node >= 0.10.26"
 }
