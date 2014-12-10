@@ -36,4 +36,17 @@ weave.WeaveError = function(e) {
 
 weave.WeaveError.prototype = new Error();
 
+weave.Log = (function() {
+  var log = function(level, msg) {
+    console.log(level + ": " + msg);
+  };
+
+  return {
+    debug: function(msg) { log("debug", msg); },
+    info: function(msg) { log("info", msg); },
+    warn: function(msg) { log("warn", msg); },
+    error: function(msg) { log("error", msg); }
+  };
+})();
+
 module.exports = weave;

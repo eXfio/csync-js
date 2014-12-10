@@ -165,11 +165,11 @@ if ( payload !== null ) {
   try {
 	if ( id !== null ) {
 	  var wbo = weaveClient.get(collection, id, encrypt);
-	  process.stdout.write(wbo.getPayload() + "\n");
+	  process.stdout.write(wbo.payload + "\n");
 	} else {
 	  var colWbo = weaveClient.getCollection(collection, null, null, null, null, null, null, null, null, null, encrypt);
-	  for (var wbo in colWbo) {
-		process.stdout.write(wbo.getPayload().trim() + "\n");
+	  for (var i = 0; i < colWbo.length; i++) {
+		process.stdout.write(colWbo[i].payload + "\n");
 	  }	
 	}
   } catch(e) {

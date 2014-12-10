@@ -20,6 +20,9 @@
  *  02111-1307 USA
  */
 
+//nodejs includes
+var util = require('util');
+
 //npm includes
 var sprintf = require('sprintf');
 var URI = require('URIjs');
@@ -85,7 +88,7 @@ weave.client.WeaveClient.prototype = {
 	decWbo.id         = encWbo.id
 	decWbo.modified   = encWbo.modified;
 	decWbo.sortindex  = encWbo.sortindex;
-	decWbo.payload    = decrypt(encWbo.getPayload(), collection);
+	decWbo.payload    = decrypt(encWbo.payload, collection);
 	decWbo.ttl        = encWbo.ttl;
     
     return decWbo;
@@ -126,8 +129,12 @@ weave.client.WeaveClient.prototype = {
   */
 
   get: function(collection, id, decrypt) {
+    weave.Log.debug("weave.client.WeaveClient.get()");
+
 	var wbo = this.storageClient.get(collection, id);
     
+    weave.Log.debug(util.inspect(wbo));
+
     if (decrypt) {
 	  wbo = this.decryptWeaveBasicObject(wbo, collection);
     }
@@ -135,7 +142,11 @@ weave.client.WeaveClient.prototype = {
   },
 
   getCollection: function(collection, decrypt) {
+    weave.Log.debug("weave.client.WeaveClient.getCollection()");
+
 	var wbos = this.storageClient.getCollection(collection, null, null, null, null, null, null, null, null, null);
+
+    weave.Log.debug(util.inspect(wbos));
     
     if (decrypt) {
       var decWbos = [];
@@ -182,9 +193,13 @@ weave.client.StorageApi = function() {
 weave.client.StorageApi.prototype = {
 
   init: function(storageURL, user, password) {
+    weave.Log.debug("weave.client.StorageApi.init()");
+
     this.storageURL = storageURL;
     this.user       = user;
     this.password   = password;
+
+    weave.net.Http.setCredentials({username: user, password: password});
   },
 
   /* asynchronous
@@ -227,7 +242,7 @@ weave.client.StorageApi.prototype = {
   getPath: function(path) {
 	weave.Log.debug("getPath()");
 
-    var url = URI(sprintf("1.1/%s/storage/%s", this.user, path)).relativeTo(this.storageURL);
+    var url = this.buildStorageUri(path);
 	var response = weave.net.Http.get(url, 2000);
     var jsonObject = JSON.parse(response);
 
@@ -241,15 +256,79 @@ weave.client.StorageApi.prototype = {
     return wbo;
   },
   
+  buildStorageUri: function(path) {
+	//return URI(sprintf("1.1/%s/storage/%s", this.user, path)).absoluteTo(this.storageURL).username(this.user).password(this.password);
+	return URI(sprintf("1.1/%s/storage/%s", this.user, path)).absoluteTo(this.storageURL);
+  },
+
+  buildCollectionUri: function(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, full) {
+
+	var params = {};
+
+	if ( ids !== null && ids.length > 0 ) {
+      params['ids'] = ids.join(',');
+	}
+	if (older !== null) {
+	  params['older'] = sprintf("%.2f", older);
+	}
+	if (newer !== null) {
+	  params['newer'] = sprintf("%.2f", newer);
+	}
+	if (index_above !== null) {
+	  params['index_above'] = index_above;
+	}
+	if (index_below !== null) {
+	  params['index_below'] = index_below;
+	}
+	if (limit !== null) {
+	  params['limit'] = limit;
+	}
+	if (offset !== null) {
+	  params['offset'] = offset;
+	}
+	if (sort !== null) {
+	  if ( sort.match(/^oldest|newest|index$/i) ) {
+		params['sort'] = sort;
+	  } else {
+		throw new weave.WeaveError(sprintf("buildCollectionUri() sort parameter value of '%s' not recognised", sort));
+	  }
+	}
+	if (format !== null) {
+	  //Only default format supported
+	  throw new weave.WeaveError(sprintf("buildCollectionUri() format parameter value of '%s' not supported", format));
+	}
+	if ( full ) {
+	  //returns entire WBO
+	  params['full'] = "1";
+	}
+
+	return URI(this.buildStorageUri(collection)).query(params);
+  },
+  
   getCollectionIds: function(collection, ids, older, newer, index_above, index_below, limit, offset, sort) {
-    
+    weave.Log.debug("weave.client.WeaveStorageApi.getCollectionIds()");
+
+	var url = this.buildCollectionUri(collection, ids, older, newer, index_above, index_below, limit, offset, sort, null, false);
+
+    weave.Log.debug("url: " + url);
+
+	var response = weave.net.Http.get(url, 2000);
+    var ids = JSON.parse(response);
+
+    return ids;
   },
   
   getCollection: function(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format) {
+    weave.Log.debug("weave.client.WeaveStorageApi.getCollection()");
+
+	var url = this.buildCollectionUri(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, true);
+
+    weave.Log.debug("url: " + url);
     
-  },
-  
-  getCollectionPath: function(location) {
-    
+	var response = weave.net.Http.get(url, 2000);
+    var wbos = JSON.parse(response);
+
+    return wbos;
   }
+  
 };
