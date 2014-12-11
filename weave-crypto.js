@@ -25,7 +25,7 @@ var sprintf = require('sprintf').sprintf;
 var forge   = require('node-forge');
 
 //other third party includes
-var JSON = require('./lib/json2');
+//var JSON = require('./lib/json2');
 
 //app includes
 var weave = require('./weave-include');
@@ -38,9 +38,13 @@ weave.crypto.WeaveKeyPair = function() {
   var hmacKey;
 }
 
-weave.crypto.PayloadCipher = function() {
-  
-  function _decrypt(payload, keyPair) {
+weave.crypto.PayloadCipher = function() {}
+
+weave.crypto.PayloadCipher.prototype = {
+
+  decrypt: function(payload, keyPair) {
+    weave.Log.debug("weave.crypto.PayloadCipher.decrypt()");
+
 	var cleartext     = null;
 	var encryptObject = null;
 	
@@ -53,11 +57,11 @@ weave.crypto.PayloadCipher = function() {
     
     // An encrypted payload has three relevant fields
     var ciphertext  = encryptObject.ciphertext;
-    var cipherbytes = Weave.Util.Base64.decode(ciphertext);
-    var iv          = Weave.Util.Base64.decode(encryptObject.IV);
+    var cipherbytes = weave.util.Base64.decode(ciphertext);
+    var iv          = weave.util.Base64.decode(encryptObject.IV);
     var cipher_hmac = encryptObject.hmac;
     
-    weave.Log.debug( sprintf("payload: %s, crypt key:  %s, crypt hmac: %s", payload, Weave.Util.Hex.encode(keyPair.cryptKey), Weave.Util.Hex.encode(keyPair.hmacKey)));
+    weave.Log.debug( sprintf("payload: %s, crypt key:  %s, crypt hmac: %s", payload, weave.util.Hex.encode(keyPair.cryptKey), weave.util.Hex.encode(keyPair.hmacKey)));
     
     
     // 1. Validate hmac of ciphertext
@@ -68,7 +72,7 @@ weave.crypto.PayloadCipher = function() {
       var hmacSHA256 = forge.hmac.create();
       hmacSHA256.start('sha256', keyPair.hmacKey);
       hmacSHA256.update(ciphertext);
-      local_hmac = hmac256.digest().toHex();
+      local_hmac = hmacSHA256.digest().toHex();
 	} catch (e) {
 	  throw new weave.WeaveError(e);
 	}
@@ -98,7 +102,7 @@ weave.crypto.PayloadCipher = function() {
     weave.Log.info("Successfully decrypted v5 data record");
     
 	return cleartext;
-  }
+  },
   
   
   /**
@@ -106,12 +110,12 @@ weave.crypto.PayloadCipher = function() {
    *
    * Given a plaintext object, encrypt it and return the ciphertext value.
    */
-  function _encrypt(plaintext, keyPair) {
+  encrypt: function(plaintext, keyPair) {
 	weave.Log.debug("encrypt()");
 	weave.Log.debug("plaintext:\n" + plaintext);
 	
-    weave.Logdebug(sprintf("payload: %s, crypt key:  %s, crypt hmac: %s", plaintext, Weave.Util.Hex.encode(keyPair.cryptKey), Weave.Util.Hex.encode(keyPair.hmacKey)));
-		        
+    weave.Log.debug(sprintf("payload: %s, crypt key:  %s, crypt hmac: %s", plaintext, weave.util.Hex.encode(keyPair.cryptKey), weave.util.Hex.encode(keyPair.hmacKey)));
+	
 	// Encryption primitives
     var ciphertext  = null;
     var cipherbytes = new array();
@@ -137,7 +141,7 @@ weave.crypto.PayloadCipher = function() {
     
     // 2. Create hmac of ciphertext
     // Note: HMAC is done against base64 encoded ciphertext
-    ciphertext = Weave.Util.Base64.encode(cipherbytes);
+    ciphertext = weave.util.Base64.encode(cipherbytes);
     
     try {
       var hmacSHA256 = forge.hmac.create();
@@ -154,18 +158,13 @@ weave.crypto.PayloadCipher = function() {
     // Construct JSONUtils encoded payload
 	var encryptObject = {};
 	encryptObject.ciphertext = ciphertext;
-	encryptObject.IV         = Weave.Util.Base64.encode(iv);
-	encryptObject.hmac       = Weave.Util.Hex.encode(hmac);
+	encryptObject.IV         = weave.util.Base64.encode(iv);
+	encryptObject.hmac       = weave.util.Hex.encode(hmac);
 	
 	return JSON.stringify(encryptObject);
   }	
 
-  return {
-    decrypt: _decrypt,
-    encrypt: _encrypt
-  };
-
-}();
+};
 
 /*
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-1,
