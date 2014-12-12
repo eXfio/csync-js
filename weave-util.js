@@ -1,5 +1,6 @@
 //npm includes
-var sprintf     = require('sprintf').sprintf;
+var sprintf = require('sprintf').sprintf;
+var forge   = require('node-forge');
 
 //Module DOES NOT correctly support binary data
 //var binstring   = require('binstring');
@@ -163,7 +164,7 @@ weave.util.Utils = function() {
 
     var retval = new Uint8Array(returnArray);
     return _uint8ToString(retval);
-  };
+  }
 
   function _uint8ToString(u8a){
     var CHUNK_SZ = 0x8000;
@@ -174,6 +175,15 @@ weave.util.Utils = function() {
     return c.join("");
   }
 
+  function _binConcat() {
+    var buf = forge.util.createBuffer();
+    for (var i = 0; i < arguments.length; i++) {
+      var tmpBuf = forge.util.createBuffer(arguments[i], 'raw');
+      buf.putBytes(tmpBuf.getBytes());
+    }
+    return buf.getBytes();
+  }
+
   return {
     XOR: _XOR,
     HtS: _hexToString,
@@ -181,6 +191,7 @@ weave.util.Utils = function() {
     AtS: _arrayToString,
     StA: _stringToArray,
     B32tS: _base32Decode,
+    binConcat: _binConcat,
     intify: _intify,
     clearify: _clearify
   };
@@ -330,8 +341,8 @@ weave.util.Hex = (function() {
   };
  
 })();
-*/
 
+//HtS broken
 weave.util.Hex = (function() {
   
   return {
@@ -341,6 +352,22 @@ weave.util.Hex = (function() {
 
     encode: function(bin) {
       return weave.util.Utils.StH(bin)
+    }
+
+  };
+ 
+})();
+*/
+
+weave.util.Hex = (function() {
+  
+  return {
+    decode: function(encoded) { 
+      return forge.util.hexToBytes(encoded)
+    },
+
+    encode: function(bin) {
+      return forge.util.bytesToHex(bin)
     }
 
   };
@@ -581,6 +608,22 @@ weave.util.UTF8 = (function() {
   };
 
 })();
+
+/*
+weave.util.UTF8 = (function() {
+  return {
+    decode: function(encoded) {
+      return forge.util.decodeUtf8(encoded);
+    },
+
+    encode: function(string) {
+      return forge.util.encodeUtf8(string);
+    }
+
+  };
+
+})();
+*/
 
 weave.util.StringUtils = (function () {
 

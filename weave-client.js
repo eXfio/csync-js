@@ -50,8 +50,6 @@ weave.client.WeaveBasicObject = function() {
 weave.client.WeaveBasicObject.prototype = {
   getPayloadAsJSONObject: function() {
     weave.Log.debug("weave.client.WeaveBasicObject.getPayloadAsJSONObject()");
-    weave.Log.debug(util.inspect(this.payload));
-
     return JSON.parse(this.payload);
   }
 };
@@ -125,14 +123,12 @@ weave.client.WeaveClient.prototype = {
 		syncKeyB32 = weave.util.StringUtils.rightPad(syncKeyB32, paddedLength, '=');
 	  }
 
-	  weave.Log.debug(sprintf("padded sync key: %s", syncKeyB32));
-
 	  var syncKeyBin = weave.util.Base32.decode(syncKeyB32);
 
       var keyInfo = "Sync-AES_256_CBC-HMAC256" + this.account.user;
 
 	  // For testing only
-	  //syncKey = binascii.unhexlify("c71aa7cbd8b82a8ff6eda55c39479fd2")
+	  //syncKeyBin = weave.util.Hex.decode("c71aa7cbd8b82a8ff6eda55c39479fd2")
 	  //keyInfo = "Sync-AES_256_CBC-HMAC256" + "johndoe@example.com"
 
 	  weave.Log.debug(sprintf("base32 key: %s decoded to %s", this.account.syncKey, weave.util.Hex.encode(syncKeyBin)));
@@ -141,11 +137,12 @@ weave.client.WeaveClient.prototype = {
 
       var hmacSHA256 = forge.hmac.create();
       hmacSHA256.start('sha256', syncKeyBin);
-      hmacSHA256.update(weave.util.UTF8.encode(keyInfo + 0x01));
+      hmacSHA256.update(weave.util.UTF8.encode(keyInfo + "\x01"));
 	  keyPair.cryptKey = hmacSHA256.digest();
 
+      hmacSHA256 = forge.hmac.create();
       hmacSHA256.start('sha256', syncKeyBin);
-      hmacSHA256.update(weave.util.UTF8.encode(keyInfo + 0x02));
+      hmacSHA256.update(weave.util.Utils.binConcat(keyPair.cryptKey, weave.util.UTF8.encode(keyInfo + "\x02")));
 	  keyPair.hmacKey = hmacSHA256.digest();
 	  
 	  this.privateKey = keyPair;
@@ -262,8 +259,6 @@ weave.client.WeaveClient.prototype = {
 
 	var wbo = this.storageClient.get(collection, id);
     
-    weave.Log.debug(util.inspect(wbo));
-
     if (decrypt) {
 	  wbo = this.decryptWeaveBasicObject(wbo, collection);
     }
@@ -278,8 +273,6 @@ weave.client.WeaveClient.prototype = {
 
 	var wbos = this.storageClient.getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format);
 
-    weave.Log.debug(util.inspect(wbos));
-    
     if (decrypt) {
       var decWbos = [];
       for (var i = 0; i < wbos.length; i++) {
@@ -414,8 +407,6 @@ weave.client.StorageApi.prototype = {
 
 	var url = this.buildCollectionUri(collection, ids, older, newer, index_above, index_below, limit, offset, sort, null, false);
 
-    weave.Log.debug("url: " + url);
-
 	var response = weave.net.Http.get(url, 2000);
     var ids = JSON.parse(response);
 
@@ -427,8 +418,6 @@ weave.client.StorageApi.prototype = {
 
 	var url = this.buildCollectionUri(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, true);
 
-    weave.Log.debug("url: " + url);
-    
 	var response = weave.net.Http.get(url, 2000);
     var jsonArray = JSON.parse(response);
 

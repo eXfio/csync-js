@@ -87,12 +87,12 @@ weave.crypto.PayloadCipher.prototype = {
     // openssl enc -d -in data -aes-256-cbc -K `cat unwrapped_symkey.16` -iv `cat iv.16`
     try {
       
-      var cipher = forge.cipher.createDecipher('AES-CBC', keyPari.cryptKey); ///PKCS5Padding");
+      var cipher = forge.cipher.createDecipher('AES-CBC', keyPair.cryptKey); ///PKCS5Padding");
       cipher.start({iv: iv});
-      cipher.update(cipherbytes);
+      cipher.update(forge.util.createBuffer(cipherbytes));
       cipher.finish();
-      cleartext = cipher.output.toString();
-      
+      cleartext = cipher.output;
+
       weave.Log.debug(sprintf("cleartext: %s", cleartext));
       
 	} catch (e) {
