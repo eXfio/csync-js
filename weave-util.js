@@ -7,6 +7,20 @@ var weave = require('./weave-include');
 
 weave.util = {};
 
+weave.util.Log = (function() {
+
+  var log = function(level, msg) {
+    forge.log.logMessage({level: level, message: msg});
+  };
+
+  return {
+    debug: function(msg) { log("debug", msg); },
+    info: function(msg) { log("info", msg); },
+    warn: function(msg) { log("warning", msg); },
+    error: function(msg) { log("error", msg); }
+  };
+})();
+
 weave.util.Base64 = (function() {
   
   return {

@@ -49,7 +49,7 @@ weave.client.WeaveBasicObject = function() {
 
 weave.client.WeaveBasicObject.prototype = {
   getPayloadAsJSONObject: function() {
-    weave.Log.debug("weave.client.WeaveBasicObject.getPayloadAsJSONObject()");
+    weave.util.Log.debug("weave.client.WeaveBasicObject.getPayloadAsJSONObject()");
     return JSON.parse(this.payload);
   }
 };
@@ -102,7 +102,7 @@ weave.client.WeaveClient.prototype = {
    * storage for later use.
    */
   getPrivateKeyPair: function() {
-	weave.Log.debug("weave.client.WeaveClient.getPrivateKeyPair()");
+	weave.util.Log.debug("weave.client.WeaveClient.getPrivateKeyPair()");
 
 	if ( this.privateKey === null ) {
       
@@ -115,7 +115,7 @@ weave.client.WeaveClient.prototype = {
 		.replace('9', 'O', 'g')
 		.replace("-", "", 'g');
 
-	  weave.Log.debug(sprintf("normalised sync key: %s",  syncKeyB32));
+	  weave.util.Log.debug(sprintf("normalised sync key: %s",  syncKeyB32));
 
 	  // Pad base32 string to multiple of 8 chars (40 bits)
 	  if ( (syncKeyB32.length % 8) > 0 ) {
@@ -131,7 +131,7 @@ weave.client.WeaveClient.prototype = {
 	  //syncKeyBin = weave.util.Hex.decode("c71aa7cbd8b82a8ff6eda55c39479fd2")
 	  //keyInfo = "Sync-AES_256_CBC-HMAC256" + "johndoe@example.com"
 
-	  weave.Log.debug(sprintf("base32 key: %s decoded to %s", this.account.syncKey, weave.util.Hex.encode(syncKeyBin)));
+	  weave.util.Log.debug(sprintf("base32 key: %s decoded to %s", this.account.syncKey, weave.util.Hex.encode(syncKeyBin)));
 
 	  var keyPair = new weave.crypto.WeaveKeyPair();
 
@@ -147,8 +147,8 @@ weave.client.WeaveClient.prototype = {
 	  
 	  this.privateKey = keyPair;
 	  
-	  weave.Log.info("Successfully generated sync key and hmac key");
-	  weave.Log.debug(sprintf("sync key: %s, crypt key: %s, crypt hmac: %s", this.account.syncKey, weave.util.Hex.encode(keyPair.cryptKey), weave.util.Hex.encode(keyPair.hmacKey)));
+	  weave.util.Log.info("Successfully generated sync key and hmac key");
+	  weave.util.Log.debug(sprintf("sync key: %s, crypt key: %s, crypt hmac: %s", this.account.syncKey, weave.util.Hex.encode(keyPair.cryptKey), weave.util.Hex.encode(keyPair.hmacKey)));
 	}
     
 	return this.privateKey;
@@ -160,10 +160,10 @@ weave.client.WeaveClient.prototype = {
    * into self storage for later decrypt operations.
    */
   getBulkKeyPair: function(collection) {
-	weave.Log.debug("weave.client.WeaveClient.getBulkKeyPair()");
+	weave.util.Log.debug("weave.client.WeaveClient.getBulkKeyPair()");
 	
 	if ( this.bulkKeys === null ) {
-	  weave.Log.info("Fetching bulk keys from server");
+	  weave.util.Log.info("Fetching bulk keys from server");
       
       varres = null;
       try {
@@ -195,13 +195,13 @@ weave.client.WeaveClient.prototype = {
         this.bulkKeys[col] = colKeyPair;
       }
       
-      weave.Log.info(sprintf("Successfully decrypted bulk key for %s", collection));
+      weave.util.Log.info(sprintf("Successfully decrypted bulk key for %s", collection));
 	}
 
     if ( collection in this.bulkKeys )  {
       return this.bulkKeys['collection'];
     } else if ( 'default' in this.bulkKeys ) {
-      weave.Log.info(sprintf("No key found for %s, using default", collection));
+      weave.util.Log.info(sprintf("No key found for %s, using default", collection));
       return this.bulkKeys['default'];      	
     } else {
       throw new weav.WeaveError("No default key found");
@@ -209,7 +209,7 @@ weave.client.WeaveClient.prototype = {
   },
   
   decryptWeaveBasicObject: function(encWbo, collection) {
-    weave.Log.debug("weave.client.WeaveClient.decryptWeaveBasicObject()");
+    weave.util.Log.debug("weave.client.WeaveClient.decryptWeaveBasicObject()");
 
 	if ( !this.isEncrypted(encWbo) ) {
 	  throw new weave.WeaveError("Weave Basic Object already decrypted");
@@ -227,12 +227,12 @@ weave.client.WeaveClient.prototype = {
   },
   
   decrypt: function(payload, collection) {
-    weave.Log.debug("weave.client.WeaveClient.decrypt()");
+    weave.util.Log.debug("weave.client.WeaveClient.decrypt()");
     
     var keyPair = new weave.crypto.WeaveKeyPair();
     
     if ( collection === null ) {
-      weave.Log.info("Decrypting data record using sync key");
+      weave.util.Log.info("Decrypting data record using sync key");
       
       try {
         keyPair = this.getPrivateKeyPair();
@@ -241,7 +241,7 @@ weave.client.WeaveClient.prototype = {
       }
       
     } else {
-      weave.Log.info(sprintf("Decrypting data record using bulk key %s", collection));
+      weave.util.Log.info(sprintf("Decrypting data record using bulk key %s", collection));
       
       keyPair = this.getBulkKeyPair(collection);
     }
@@ -252,7 +252,7 @@ weave.client.WeaveClient.prototype = {
   },
     
   get: function(collection, id, decrypt) {
-    weave.Log.debug("weave.client.WeaveClient.get()");
+    weave.util.Log.debug("weave.client.WeaveClient.get()");
 
     //handle defaults
     decrypt = (typeof decrypt !== 'undefined' ? decrypt : true);
@@ -266,7 +266,7 @@ weave.client.WeaveClient.prototype = {
   },
 
   getCollection: function(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, decrypt) {
-    weave.Log.debug("weave.client.WeaveClient.getCollection()");
+    weave.util.Log.debug("weave.client.WeaveClient.getCollection()");
 
     //handle defaults
     decrypt = (typeof decrypt !== 'undefined' ? decrypt : true);
@@ -318,7 +318,7 @@ weave.client.StorageApi = function() {
 weave.client.StorageApi.prototype = {
 
   init: function(storageURL, user, password) {
-    weave.Log.debug("weave.client.StorageApi.init()");
+    weave.util.Log.debug("weave.client.StorageApi.init()");
 
     this.storageURL = storageURL;
     this.user       = user;
@@ -328,7 +328,7 @@ weave.client.StorageApi.prototype = {
   },
 
   get: function(collection, id) {
-	weave.Log.debug("get()");
+	weave.util.Log.debug("get()");
 
     var path = null;
     if (typeof id !== 'undefined') {
@@ -403,7 +403,7 @@ weave.client.StorageApi.prototype = {
   },
   
   getCollectionIds: function(collection, ids, older, newer, index_above, index_below, limit, offset, sort) {
-    weave.Log.debug("weave.client.WeaveStorageApi.getCollectionIds()");
+    weave.util.Log.debug("weave.client.WeaveStorageApi.getCollectionIds()");
 
 	var url = this.buildCollectionUri(collection, ids, older, newer, index_above, index_below, limit, offset, sort, null, false);
 
@@ -414,7 +414,7 @@ weave.client.StorageApi.prototype = {
   },
   
   getCollection: function(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format) {
-    weave.Log.debug("weave.client.WeaveStorageApi.getCollection()");
+    weave.util.Log.debug("weave.client.WeaveStorageApi.getCollection()");
 
 	var url = this.buildCollectionUri(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, true);
 

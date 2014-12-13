@@ -43,7 +43,7 @@ weave.crypto.PayloadCipher = function() {}
 weave.crypto.PayloadCipher.prototype = {
 
   decrypt: function(payload, keyPair) {
-    weave.Log.debug("weave.crypto.PayloadCipher.decrypt()");
+    weave.util.Log.debug("weave.crypto.PayloadCipher.decrypt()");
 
 	var cleartext     = null;
 	var encryptObject = null;
@@ -61,7 +61,7 @@ weave.crypto.PayloadCipher.prototype = {
     var iv          = weave.util.Base64.decode(encryptObject.IV);
     var cipher_hmac = encryptObject.hmac;
     
-    weave.Log.debug( sprintf("payload: %s, crypt key:  %s, crypt hmac: %s", payload, weave.util.Hex.encode(keyPair.cryptKey), weave.util.Hex.encode(keyPair.hmacKey)));
+    weave.util.Log.debug( sprintf("payload: %s, crypt key:  %s, crypt hmac: %s", payload, weave.util.Hex.encode(keyPair.cryptKey), weave.util.Hex.encode(keyPair.hmacKey)));
     
     
     // 1. Validate hmac of ciphertext
@@ -78,7 +78,7 @@ weave.crypto.PayloadCipher.prototype = {
 	}
     
     if ( local_hmac !== cipher_hmac ) {
-      weave.Log.warn(sprintf("cipher hmac: %s, local hmac: %s", cipher_hmac, local_hmac));
+      weave.util.Log.warn(sprintf("cipher hmac: %s, local hmac: %s", cipher_hmac, local_hmac));
       throw new weave.WeaveError("HMAC verification failed!");
     }
     
@@ -93,13 +93,13 @@ weave.crypto.PayloadCipher.prototype = {
       cipher.finish();
       cleartext = cipher.output;
 
-      weave.Log.debug(sprintf("cleartext: %s", cleartext));
+      weave.util.Log.debug(sprintf("cleartext: %s", cleartext));
       
 	} catch (e) {
 	  throw new weave.WeaveError(e);
     }
     
-    weave.Log.info("Successfully decrypted v5 data record");
+    weave.util.Log.info("Successfully decrypted v5 data record");
     
 	return cleartext;
   },
@@ -111,10 +111,10 @@ weave.crypto.PayloadCipher.prototype = {
    * Given a plaintext object, encrypt it and return the ciphertext value.
    */
   encrypt: function(plaintext, keyPair) {
-	weave.Log.debug("encrypt()");
-	weave.Log.debug("plaintext:\n" + plaintext);
+	weave.util.Log.debug("encrypt()");
+	weave.util.Log.debug("plaintext:\n" + plaintext);
 	
-    weave.Log.debug(sprintf("payload: %s, crypt key:  %s, crypt hmac: %s", plaintext, weave.util.Hex.encode(keyPair.cryptKey), weave.util.Hex.encode(keyPair.hmacKey)));
+    weave.util.Log.debug(sprintf("payload: %s, crypt key:  %s, crypt hmac: %s", plaintext, weave.util.Hex.encode(keyPair.cryptKey), weave.util.Hex.encode(keyPair.hmacKey)));
 	
 	// Encryption primitives
     var ciphertext  = null;
@@ -153,7 +153,7 @@ weave.crypto.PayloadCipher.prototype = {
 	  throw new weave.WeaveError(e);
 	}
     
-	weave.Log.info("Successfully encrypted v5 data record");
+	weave.util.Log.info("Successfully encrypted v5 data record");
     
     // Construct JSONUtils encoded payload
 	var encryptObject = {};

@@ -16,7 +16,7 @@ weave.net.Http = (function() {
 
   return {
     setCredentials: function(auth) {
-      weave.Log.debug("weave.net.Http.setCredentials()");
+      weave.util.Log.debug("weave.net.Http.setCredentials()");
 
       credentials = auth;
     },
@@ -53,7 +53,7 @@ weave.net.Http = (function() {
     },
     
     get: function(url, timeout) {
-      weave.Log.debug("weave.net.Http.get()");
+      weave.util.Log.debug("weave.net.Http.get()");
 
       var xhr = new XMLHttpRequest();
       
