@@ -142,7 +142,7 @@ weave.client.WeaveClient.prototype = {
 
       hmacSHA256 = forge.hmac.create();
       hmacSHA256.start('sha256', syncKeyBin);
-      hmacSHA256.update(weave.util.Utils.binConcat(keyPair.cryptKey, weave.util.UTF8.encode(keyInfo + "\x02")));
+      hmacSHA256.update(weave.util.BinUtils.binConcat(keyPair.cryptKey, weave.util.UTF8.encode(keyInfo + "\x02")));
 	  keyPair.hmacKey = hmacSHA256.digest();
 	  
 	  this.privateKey = keyPair;
