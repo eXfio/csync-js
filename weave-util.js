@@ -9,15 +9,28 @@ weave.util = {};
 
 weave.util.Log = (function() {
 
-  var log = function(level, msg) {
-    forge.log.logMessage({level: level, message: msg});
+  var logLevel = {
+    debug: "debug",
+    info: "info",
+    warn: "warning",
+    error: "error"
+  };
+
+  var logMessage = function(level, msg) {
+    //console.log("weave.util.Log.log(), level: " + logLevel[level]);
+    forge.log.logMessage({timestamp: new Date(), level: logLevel[level], category: "weaveclient-js", message: msg});
   };
 
   return {
-    debug: function(msg) { log("debug", msg); },
-    info: function(msg) { log("info", msg); },
-    warn: function(msg) { log("warning", msg); },
-    error: function(msg) { log("error", msg); }
+    setLevel: function(level) {
+      //console.log("weave.util.Log.setLevel(), level: " + logLevel[level]);
+      forge.log.setLevel(forge.log.consoleLogger, logLevel[level]);
+    },
+    log: function(level, msg) {logMessage(level, msg); },
+    debug: function(msg) { logMessage("debug", msg); },
+    info: function(msg) { logMessage("info", msg); },
+    warn: function(msg) { logMessage("warn", msg); },
+    error: function(msg) { logMessage("error", msg); }
   };
 })();
 

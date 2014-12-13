@@ -46,7 +46,7 @@ var payload    = null;
 var remove     = false;
 var info       = false;
 var encrypt    = true;
-
+var logLevel   = null;
 		
 // Parse commandline arguments
 var getopt = new Getopt([
@@ -59,7 +59,8 @@ var getopt = new Getopt([
   ["i", "id=ARG", "object ID"],
   ["t", "plaintext", "do not encrypt/decrypt item"],
   ["m", "modify=ARG", "update item with given value in JSONUtils format. Requires -c and -i"],
-  ["d", "delete", "delete item. Requires -c and -i"]
+  ["d", "delete", "delete item. Requires -c and -i"],
+  ["l", "log-level=", "set log level (trace|debug|info|warn|error)"]
 ]);
 
 getopt.bindHelp();
@@ -71,6 +72,17 @@ if ( 'help' in cmd.options ) {
   getopt.showHelp();
   process.exit(0);
 }
+
+//Need to set log level BEFORE instansiating Logger
+logLevel = 'warn';
+if ( 'log-level' in cmd.options ) {
+  logLevel = cmd.options['log-level'].toString().toLowerCase();
+  if ( !logLevel.match("^trace|debug|info|warn|error\$") ) {
+	process.stderr.write("log level must be one of (trace|debug|info|warn|error)\n");
+	process.exit(1);
+  }
+}
+weave.util.Log.setLevel(logLevel);
 
 //Set host and credential details from command line
 baseURL  = 'server' in cmd.options ? cmd.options['server'] : null;
