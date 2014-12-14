@@ -11,8 +11,8 @@ weave.util.Log = (function() {
 
   var logLevel = {
     debug: "debug",
-    info: "info",
-    warn: "warning",
+    info:  "info",
+    warn:  "warning",
     error: "error"
   };
 
@@ -26,10 +26,10 @@ weave.util.Log = (function() {
       //console.log("weave.util.Log.setLevel(), level: " + logLevel[level]);
       forge.log.setLevel(forge.log.consoleLogger, logLevel[level]);
     },
-    log: function(level, msg) {logMessage(level, msg); },
+    log:   function(level, msg) {logMessage(level, msg); },
     debug: function(msg) { logMessage("debug", msg); },
-    info: function(msg) { logMessage("info", msg); },
-    warn: function(msg) { logMessage("warn", msg); },
+    info:  function(msg) { logMessage("info", msg); },
+    warn:  function(msg) { logMessage("warn", msg); },
     error: function(msg) { logMessage("error", msg); }
   };
 })();

@@ -24,9 +24,7 @@
 var util = require('util');
 
 //npm includes
-var Getopt = require('node-getopt');
-
-//jam includes
+var Getopt  = require('node-getopt');
 var sprintf = require('sprintf').sprintf;
 
 //app includes
