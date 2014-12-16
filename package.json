@@ -1,7 +1,32 @@
 {
-  "name": "weaveclient-js",
+  "name": "weaveclient",
+  "version": "1.0.0-alpha.1",
   "description": "Weave Client",
-  "author": "Gerry <nickel_chrome@mac.com>",
+  "author": "Gerry <nickel_chrome@exfio.org>",
+  "licenses": [
+    {
+      "type": "MPL-2.0",
+      "url": "http://www.mozilla.org/MPL/2.0/"
+    },
+    {
+      "type": "LGPL-3.0+",
+      "url": "http://www.gnu.org/licenses/lgpl-3.0-standalone.html"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nickel_chrome/weaveclient-js"
+  },
+  "bugs": {
+    "url": "https://github.com/nickel_chrome/weaveclient-js/issues"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "main": "lib/weave-client.js",
+  "bin": {
+    "weaveclient": "./bin/weaveclient"
+  },
   "dependencies": {
     "node-getopt": "latest"
     ,"node-forge": "latest"
@@ -9,5 +34,5 @@
     ,"URIjs": "latest"
     ,"xmlhttprequest": "latest"
   },
-  "engine": "node >= 0.10.26"
+  "engine": "*"
 }
