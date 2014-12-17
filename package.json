@@ -15,10 +15,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/nickel_chrome/weaveclient-js"
+    "url": "https://github.com/nickel-chrome/weaveclient-js"
   },
   "bugs": {
-    "url": "https://github.com/nickel_chrome/weaveclient-js/issues"
+    "url": "https://github.com/nickel-chrome/weaveclient-js/issues"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
