@@ -12,12 +12,14 @@
     "url": "https://github.com/nickel-chrome/weaveclient-js/issues"
   },
   "scripts": {
+    "bundle": "node_modules/browserify/bin/cmd.js --ignore-missing --standalone weave . -o weaveclient-bundle.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "main": "lib/weave-client.js",
+  "main": "weaveclient.js",
   "bin": {
     "weaveclient": "./bin/weaveclient"
   },
+  "engine": "*",
   "dependencies": {
     "URIjs": "^1.16.1",
     "browserid-crypto": "^0.8.0",
@@ -29,5 +31,23 @@
     "sprintf": "^0.1.5",
     "xmlhttprequest": "^1.8.0"
   },
-  "engine": "*"
+  "devDependencies": {
+    "browserify": "^13.0.0",
+    "browserify-shim": "^3.8.12"
+  },
+  "browserify": {
+    "transform": [
+      "browserify-shim"
+    ]
+  },
+  "browser": {
+    "xmlhttprequest": false,
+    "browserid-crypto/lib/algs/ds": false
+  },
+  "browserify-shim": {
+    "node-forge": "global:forge",
+    "fxa-js-client": "global:FxAccountClient",
+    "hawk": "global:hawk",
+    "browserid-crypto": "global:jwcrypto"
+  }
 }
