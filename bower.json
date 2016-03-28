@@ -1,0 +1,30 @@
+{
+  "name": "weaveclient",
+  "version": "1.0.0.alpha.3",
+  "homepage": "https://github.com/nickel-chrome/weaveclient-js",
+  "authors": [
+    "Gerry Healy <nickel_chrome@exfio.org>"
+  ],
+  "description": "Weave client",
+  "main": "weaveclient-bundle.js",
+  "moduleType": [
+    "globals",
+    "node"
+  ],
+  "license": "MPL-2.0 OR LGPL-3.0",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "components",
+    "lib",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "forge": "~0.6.39",
+    "fxa-js-client": "git+https://github.com/eXfio/fxa-js-client.git#master",
+    "hawk": "3.1.3",
+    "browserid-crypto": "https://github.com/eXfio/browserid-crypto.git#master"
+  }
+}
