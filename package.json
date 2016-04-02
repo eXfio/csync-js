@@ -13,6 +13,7 @@
   },
   "scripts": {
     "bundle": "browserify --standalone weave . -o weaveclient-bundle.js && uglifyjs weaveclient-bundle.js -o weaveclient-bundle-min.js --source-map weaveclient-bundle-min.js.map --source-map-root https://github.com/nickel-chrome/weaveclient-js -c -m",
+    "bundle-script": "node script/bundle.js && uglifyjs weaveclient-bundle.js -o weaveclient-bundle-min.js --source-map weaveclient-bundle-min.js.map --source-map-root https://github.com/nickel-chrome/weaveclient-js -c -m",
     "prepublish": "browserify --standalone weave . -o weaveclient-bundle.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -37,19 +38,16 @@
     "browserify-shim": "^3.8.12",
     "uglify-js": "^2.6.2"
   },
+  "browser": {
+    "xmlhttprequest": false
+  },
   "browserify": {
     "transform": [
       "browserify-shim"
     ]
   },
-  "browser": {
-    "xmlhttprequest": false,
-    "browserid-crypto/lib/algs/ds": false
-  },
   "browserify-shim": {
     "node-forge": "global:forge",
-    "fxa-js-client": "global:FxAccountClient",
-    "hawk": "global:hawk",
-    "browserid-crypto": "global:jwcrypto"
+    "fxa-js-client": "global:FxAccountClient"
   }
 }
