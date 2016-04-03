@@ -12,9 +12,8 @@
     "url": "https://github.com/nickel-chrome/weaveclient-js/issues"
   },
   "scripts": {
-    "bundle": "browserify --standalone weave . -o weaveclient-bundle.js && uglifyjs weaveclient-bundle.js -o weaveclient-bundle-min.js --source-map weaveclient-bundle-min.js.map --source-map-root https://github.com/nickel-chrome/weaveclient-js -c -m",
-    "bundle-script": "node script/bundle.js && uglifyjs weaveclient-bundle.js -o weaveclient-bundle-min.js --source-map weaveclient-bundle-min.js.map --source-map-root https://github.com/nickel-chrome/weaveclient-js -c -m",
-    "prepublish": "browserify --standalone weave . -o weaveclient-bundle.js",
+    "bundle": "node script/bundle.js && uglifyjs weaveclient-bundle.js -o weaveclient-bundle-min.js --source-map weaveclient-bundle-min.js.map --source-map-root https://github.com/nickel-chrome/weaveclient-js -c -m",
+    "prepublish": "node script/bundle.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "main": "weaveclient.js",
@@ -38,9 +37,6 @@
     "browserify-shim": "^3.8.12",
     "uglify-js": "^2.6.2"
   },
-  "browser": {
-    "xmlhttprequest": false
-  },
   "browserify": {
     "transform": [
       "browserify-shim"
@@ -48,6 +44,7 @@
   },
   "browserify-shim": {
     "node-forge": "global:forge",
-    "fxa-js-client": "global:FxAccountClient"
+    "fxa-js-client": "global:FxAccountClient",
+    "browserid-crypto": "global:jwcrypto"
   }
 }

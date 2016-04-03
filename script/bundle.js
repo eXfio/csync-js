@@ -21,26 +21,6 @@ if (existsSync(OUTPUT)) {
 var bundle = browserify({standalone: 'weave'});
 
 /*
-  "browserify": {
-    "transform": [
-      "browserify-shim"
-    ]
-  },
-  "browserify-shim": {
-    "node-forge": "global:forge",
-    "fxa-js-client": "global:FxAccountClient"
-  }
-*/
-
-/*
-var browserifyShimConfig = {
-  "node-forge": "global:forge",
-  "fxa-js-client": "global:FxAccountClient"
-};
-bundle.transform(browserifyShim, browserifyShimConfig);
-*/
-
-/*
 var aliasifyConfig = {
   "util-deprecate": "chrome-util-deprecate"
 };
@@ -50,8 +30,7 @@ bundle.transform(aliasify, aliasifyConfig);
 //omit builtin Node crypto and bigint modules
 //bundle.exclude('crypto');
 //bundle.exclude('bignum');
-//bundle.ignore('crypto');
-//bundle.ignore('bignum');
+bundle.ignore('browserid-crypto/lib/algs/ds');
 
 //omit Node xmlhttprequest compat module
 bundle.exclude('xmlhttprequest');
