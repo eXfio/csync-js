@@ -45,17 +45,19 @@ fxAccount.FxAccount = function() {
   this.storageApiVersion = "v1_5";
   this.cryptoApiVersion  = "v5";
 
+  this.fxaClient     = null;
   this.accountServer = null;
   this.tokenServer   = null
+
+  //To instantiate FxAccount user and passsword OR fxaSession and kB are required
   this.user          = null;
   this.password      = null;
 
-  this.fxaClient            = null;
-  this.fxaSession           = null;
-  this.browserIdCertificate = null;
-  this.syncToken            = null;
-  this.kB                   = null;
-  this.keyPair              = null;
+  this.fxaSession    = null;
+  this.kB            = null;
+
+  this.syncToken     = null;
+  this.keyPair       = null;
 };
 
 fxAccount.FxAccount.prototype = {  
@@ -70,13 +72,11 @@ fxAccount.FxAccount.prototype = {
   'TOKEN_SERVER_HEADER_CLIENT_STATE': "X-Client-State",
 
   init: function(params, config) {
-    weave.util.Log.debug("weave.account.FxAccount.init()");
-    
-    this.accountServer = params.accountServer;
-    this.tokenServer   = params.tokenServer;
-	this.user          = params.user;
-	this.password      = params.password;
+    weave.util.Log.debug("FxAccount.init()");
 
+    weave.util.Log.debug("params: " + JSON.stringify(params));
+    
+    //Handle defaults
     if (!config) {
       config = {};
     }
@@ -84,31 +84,47 @@ fxAccount.FxAccount.prototype = {
     if ( typeof XMLHttpRequest === 'undefined' && typeof config.xhr === 'undefined' ) {
       config.xhr = require("xmlhttprequest").XMLHttpRequest;
     }
-    
-    this.fxaClient            = new FxAccountClient(this.accountServer, config);
-	this.fxaSession           = null;
-	this.browserIdCertificate = null;
-	this.syncToken            = null;
-	this.kB                   = null;
-	this.keyPair              = null;
+
+    this.accountServer = params.accountServer;
+    this.tokenServer   = params.tokenServer;
+    this.fxaClient     = new FxAccountClient(this.accountServer, config);
 
     var self = this;
+
+    //First make sure we have a valid FxA sessionToken
+    var sessionPromise = null;
     
-	return this.getSyncAuthToken()
-      .then(
-        function() {
-          return self.getMasterKeyPair();
-        }
-      )
-      .then(
-        function() {
-          return P(true);
-        },
-        function(error) {
-          weave.util.Log.error("Couldn't initialise FxA account - " + error);
-          return P.reject(error);
-        }
-      );
+    if ( params.sessionToken && params.kB ) {
+      this.fxaSession = params.sessionToken;
+      this.kB         = params.kB;
+      sessionPromise = P(true);
+    } else if ( params.user && params.password ) {
+	  this.user     = params.user;
+	  this.password = params.password;
+
+      sessionPromise = this.initSession()
+        .then(function() {
+          return self.getKeys();
+        });
+    } else {
+      sessionPromise = P.reject("user and passsword OR sessionToken and kB are required parameters");
+    }
+    
+    return sessionPromise
+	  .then(function() {
+        return self.getSyncAuthToken();
+      })
+      .then(function() {
+        return self.getMasterKeyPair()
+      })
+      .fail(function(error) {
+        weave.util.Log.error("Couldn't initialise FxA account - " + error);
+        return P.reject(error);
+      });
+  },
+  
+  isInitialized: function() {
+    return ( this.syncToken !== null );
   },
   
   getStorageParams: function() {
@@ -129,7 +145,6 @@ fxAccount.FxAccount.prototype = {
   },
 
   getStorageUrl: function() {
-    
     return this.syncToken.api_endpoint;
   },
 
@@ -185,7 +200,7 @@ fxAccount.FxAccount.prototype = {
    * }
    * 
    */
-  getSyncAuthToken: function(audience, clearCache) {
+  getSyncAuthToken: function(audience) {
 	weave.util.Log.debug("getSyncAuthToken()");
 
     var self = this;
@@ -200,59 +215,31 @@ fxAccount.FxAccount.prototype = {
         port: uri.port()
       });
     }
-    if ( clearCache === undefined ) {
-      clearCache = false;
-    }
-    
-	if ( clearCache ) {
-	  this.syncToken = null;
-	  this.fxaCertificate = null;
-	}
 
-	if ( this.syncToken !== null ) {
-	  return P(this.syncToken);
-	} else {
+	this.syncToken = null;
       
-	  //We don't have a sync token so lets get one
-
-      //gey keys
-	  return this.getKeys()
-        .then(
-          function() {
-	        //Get a signed certificate
-	        return self.getCertificate()
-          }
-        )
-        .then(
-          function() {
-            //Build assertion
-            return self.buildAssertion(self.browserIdCertificate.keyPair, self.browserIdCertificate.certificate, audience);
-          }
-        )
-        .then(
-          function(assertion) {
-            var clientState = self.deriveClientState();
-            
-	        //Request sync token
-	        return self.getTokenFromBrowserIDAssertion(assertion, clientState);
-          }
-        )
-        .then(
-	      function(token) {
-            weave.util.Log.debug("Sync token: " + JSON.stringify(token));
-            
-            self.syncToken = token;
-	        return P(token);
-          }
-        )
-        .fail(
-          function(error) {
-            weave.util.Log.error("Couldn't get sync token - " + error);
-            return P.reject(error);
-          }
-        );
-    }
-    
+	//Get browserid certificate
+    return this.getCertificate()
+      .then(function(browserIdCertificate) {
+        //Build assertion
+        return self.buildAssertion(browserIdCertificate.keyPair, browserIdCertificate.certificate, audience);
+      })
+      .then(function(assertion) {
+        var clientState = self.deriveClientState();
+        
+	    //Request sync token
+	    return self.getTokenFromBrowserIDAssertion(assertion, clientState);
+      })
+      .then(function(token) {
+        weave.util.Log.debug("Sync token: " + JSON.stringify(token));
+        
+        self.syncToken = token;
+	    return P(token);
+      })
+      .fail(function(error) {
+        weave.util.Log.error("Couldn't get sync token - " + error);
+        return P.reject(error);
+      });
   },
   
   initSession: function(force) {
@@ -284,6 +271,7 @@ fxAccount.FxAccount.prototype = {
       weave.util.Log.debug("Valid FxA session, continue");
       return P(this.fxaSession);
     } else {
+      weave.util.Log.debug("Calling fxaClient.signIn()");
 	  return this.fxaClient.signIn(this.user, this.password, {keys: true})
         .then(
           function(fxaSession) {
@@ -304,23 +292,16 @@ fxAccount.FxAccount.prototype = {
     
     var self = this;
     
-    return this.initSession()
-      .then(
-        function() {
-	      return self.fxaClient.accountKeys(self.fxaSession.keyFetchToken, self.fxaSession.unwrapBKey);
-        }
-      )
-      .then(
-        function(fxaKeys) {
-          weave.util.Log.debug(sprintf("kA: %s, kB: %s", fxaKeys.kA, fxaKeys.kB));
-          self.kB = forge.util.createBuffer(weave.util.Hex.decode(fxaKeys.kB));
-          return P(fxaKeys);
-        },
-        function(error) {
-	      weave.util.Log.error("Couldn't get FxA keys - " + error);
-          return R.reject(error);
-	    }
-      );
+	return self.fxaClient.accountKeys(self.fxaSession.keyFetchToken, self.fxaSession.unwrapBKey)
+      .then(function(fxaKeys) {
+        weave.util.Log.debug(sprintf("kA: %s, kB: %s", fxaKeys.kA, fxaKeys.kB));
+        self.kB = forge.util.createBuffer(weave.util.Hex.decode(fxaKeys.kB));
+        return P(fxaKeys);
+      })
+      .fail(function(error) {
+	    weave.util.Log.error("Couldn't get FxA keys - " + error);
+        return R.reject(error);
+	  });
   },
   
   getCertificate: function() {
@@ -329,32 +310,25 @@ fxAccount.FxAccount.prototype = {
 	var self = this;
 
     var browserIdKeyPair = null;
+    var browserIdCertificate = null;
     
 	//Mozilla Android app used duration of 12 * 60 * 60 * 1000
 	//long certificateDuration = 5 * 60 * 1000; //5minutes
 	var certificateDuration = 12 * 60 * 60 * 1000; //12 hours
     
-    return this.initSession()
-      .then(
-        function() {
-          //Generate BrowserID KeyPair
-	      return self.generateBrowserIdKeyPair();
-        } 
-      )
-      .then(
-        function(keyPair) {
-          browserIdKeyPair = keyPair;          
-	      return self.fxaClient.certificateSign(self.fxaSession.sessionToken, browserIdKeyPair.publicKey.serialize(), certificateDuration);
-        }
-	  ).then(
-        function(certificate) {
-          self.browserIdCertificate = {
-            keyPair: browserIdKeyPair,
-            certificate: certificate.cert
-          };
-          return P(self.browserIdCertificate);
-        }
-      )
+    //Generate BrowserID KeyPair
+	return self.generateBrowserIdKeyPair()
+      .then(function(keyPair) {
+        browserIdKeyPair = keyPair;          
+	    return self.fxaClient.certificateSign(self.fxaSession.sessionToken, browserIdKeyPair.publicKey.serialize(), certificateDuration);
+      })
+      .then(function(certificate) {
+        browserIdCertificate = {
+          keyPair: browserIdKeyPair,
+          certificate: certificate.cert
+        };
+        return P(browserIdCertificate);
+      })
 	  .fail(function(error) {
         weave.util.Log.error("Couldn't get FxA BrowserID certificate - " + JSON.stringify(error));
         return P.reject(error);
@@ -411,7 +385,7 @@ fxAccount.FxAccount.prototype = {
     var httpClient = new weave.net.HttpClient();
     httpClient.setAuthProvider(new weave.net.BrowserIdAuthProvider({'assertion': assertion}));
 
-    return httpClient.asyncGet(this.tokenServer, 2000, headers)
+    return httpClient.asyncGet(this.tokenServer, 5000, headers)
       .then(
         function(response) {
           //Try to parse json
@@ -499,7 +473,7 @@ fxAccount.FxAccount.prototype = {
    * Derive the key pair from kB
    */
   getMasterKeyPair: function() {
-	weave.util.Log.debug("weave.account.fxa.getMasterKeyPair()");
+	weave.util.Log.debug("FxAccount.getMasterKeyPair()");
 
     var self = this;
     
@@ -719,6 +693,7 @@ module.exports = legacyAccount;
 
 //npm includes
 var P = require('p-promise');
+var sprintf = require('sprintf');
 
 //app includes
 var weave = {};
@@ -751,40 +726,61 @@ baseClient.WeaveClient.prototype = {
     weave.util.Log.debug("WeaveClient.init()");
     this.accountClient = account;
     this.storageClient = weave.storage.StorageClientFactory.getInstance(this.accountClient.getStorageParams());
-    this.cryptoClient = weave.crypto.CryptoClientFactory.getInstance(this.storageClient, this.accountClient.getCryptoParams());
+    this.cryptoClient = weave.crypto.CryptoClientFactory.getInstance(this.storageClient, this.accountClient.getCryptoParams());    
   },
 
-  get: function(collection, id, decrypt) {
-    weave.util.Log.debug("weave.client.WeaveClient.get()");
+  initStorageAndCrypto: function() {
+    var self = this;
+    return this.accountClient.getSyncAuthToken()
+      .then(function() {
+        self.storageClient.init(self.accountClient.getStorageParams());
+        self.cryptoClient.init(self.storageClient, self.accountClient.getCryptoParams());
+        return P(true);
+      });
+  },
+  
+  isInitialized: function() {
+    return (typeof this.accountClient === 'object' && typeof this.storageClient === 'object' && typeof this.cryptoClient === 'object');
+  },
+
+  get: function(collection, id, decrypt, isRetry) {
+    weave.util.Log.debug("WeaveClient.get()");
 
     var self = this;
     
     //handle defaults
     decrypt = (typeof decrypt !== 'undefined' ? decrypt : true);
+    isRetry = (typeof isRetry !== 'undefined' ? isRetry : false);
 
     return this.storageClient.get(collection, id)
       .then(function(wbo) {
         if (decrypt) {
-	      return self.cryptoClient.decryptWeaveBasicObject(wbo, collection)
-            .then(function(wbo) {
-              return P(wbo);
-            });
+	      return self.cryptoClient.decryptWeaveBasicObject(wbo, collection);
         }
         return P(wbo);
       })
       .fail(function(error) {
-        weave.util.Log.error("Couldn't get weave collection - " + error);
-        return P.reject(error);
+        if ( !isRetry && error.match(/401\s+unauthorized/i) ) {
+          weave.util.Log.warn("Request unauthorized - requesting new sync token");
+          return self.initStorageAndCrypto()
+            .then(function() {
+              return self.get(collection, id, decrypt, true)
+            });
+        } else {
+          weave.util.Log.error("Couldn't get weave item - " + error);
+          return P.reject(error);
+        }
       });
   },
 
-  getCollection: function(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, decrypt) {
-    weave.util.Log.debug("weave.client.WeaveClient.getCollection()");
+  getCollection: function(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, decrypt, isRetry) {
+    weave.util.Log.debug("WeaveClient.getCollection()");
 
     var self = this;
     
     //handle defaults
     decrypt = (typeof decrypt !== 'undefined' ? decrypt : true);
+    isRetry = (typeof isRetry !== 'undefined' ? isRetry : false);
 
 	return this.storageClient.getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format)
       .then(function(wbos) {
@@ -801,32 +797,130 @@ baseClient.WeaveClient.prototype = {
         return P(wbos);
       })
       .fail(function(error) {
-        weave.util.Log.error("Couldn't get weave collection - " + error);
-        return P.reject(error);
+        if ( !isRetry && error.match(/401\s+unauthorized/i) ) {
+          weave.util.Log.warn("Request unauthorized - requesting new sync token");
+          return self.initStorageAndCrypto()
+            .then(function() {
+              return self.getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, decrypt, true)
+            });
+        } else {
+          weave.util.Log.error("Couldn't get weave collection - " + error);
+          return P.reject(error);
+        }
       });
   },
 
   put: function(collection, id, wbo, encrypt) {
-    weave.util.Log.debug("weave.client.WeaveClient.put()");
-    throw new weave.error.WeaveError("Put not yet implemented");
+    weave.util.Log.debug("WeaveClient.put()");
+
+    var self = this;
+    
+    //handle defaults
+    encrypt = (typeof encrypt !== 'undefined' ? encrypt : true);
+    isRetry = (typeof isRetry !== 'undefined' ? isRetry : false);
+
+    var promise = null;
+    if (encrypt) {
+	  promise = self.cryptoClient.encryptWeaveBasicObject(wbo, collection);
+    } else {
+      promise = P(wbo);
+    }
+    
+    return promise
+      .then(function(wbo) {
+        return self.storageClient.put(collection, id, wbo)
+      })
+      .fail(function(error) {
+        if ( !isRetry && error.match(/401\s+unauthorized/i) ) {
+          weave.util.Log.warn("Request unauthorized - requesting new sync token");
+          return self.initStorageAndCrypto()
+            .then(function() {
+              return self.put(collection, id, wbo, encrypt, true)
+            });
+        } else {
+          weave.util.Log.error("Couldn't put weave item - " + error);
+          return P.reject(error);
+        }
+      });
   },
 
-  delete: function(collection, id) {
-    weave.util.Log.debug("weave.client.WeaveClient.delete()");
-    throw new weave.error.WeaveError("Delete not yet implemented");
+  delete: function(collection, id, isRetry) {
+    weave.util.Log.debug("WeaveClient.delete()");    
+
+    var self = this;
+    
+    //handle defaults
+    isRetry = (typeof isRetry !== 'undefined' ? isRetry : false);
+
+    return this.storageClient.delete(collection, id)
+      .fail(function(error) {
+        if ( !isRetry && error.match(/401\s+unauthorized/i) ) {
+          weave.util.Log.warn("Request unauthorized - requesting new sync token");
+          return self.initStorageAndCrypto()
+            .then(function() {
+              return self.delete(collection, id, true)
+            });
+        } else {
+          weave.util.Log.error("Couldn't put weave item - " + error);
+          return P.reject(error);
+        }
+      });
   },
 
   deleteCollection: function(collection) {
-    weave.util.Log.debug("weave.client.WeaveClient.deleteCollection()");
+    weave.util.Log.debug("WeaveClient.deleteCollection()");
     throw new weave.error.WeaveError("Delete not yet implemented");
   },
+
+  getCollectionInfo: function(collection, getcount, getusage, isRetry) {
+    weave.util.Log.debug("WeaveClient.getCollectionInfo()");
+
+    var self = this;
+
+    //handle defaults
+    getcount = (typeof getcount !== 'undefined' ? getcount : false);
+    getusage = (typeof getusage !== 'undefined' ? getusage : false);
+    isRetry  = (typeof isRetry !== 'undefined' ? isRetry : false);
+
+	return this.storageClient.getInfoCollections(getcount, getusage)
+      .then(function(colinfo) {
+        if (colinfo && colinfo[collection]) {
+          return P(colinfo[collection]);
+        } else {
+          return P.reject(sprintf("No info for collection '%s'", collection));
+        }
+      })
+      .fail(function(error) {
+        if ( !isRetry && error.match(/401\s+unauthorized/i) ) {
+          weave.util.Log.warn("Request unauthorized - requesting new sync token");
+          return self.initStorageAndCrypto()
+            .then(function() {
+              return self.getCollectionInfo(collection, getcount, getusage, true)
+            });
+        } else {
+          weave.util.Log.error("Couldn't get weave collection info - " + error);
+          return P.reject(error);
+        }
+      });
+  },
+
+  decryptWeaveBasicObject: function(wbo, collection) {
+    weave.util.Log.debug("WeaveClient.decryptWeaveBasicObject()");
+	return this.cryptoClient.decryptWeaveBasicObject(wbo, collection);
+  },
+
+  encryptWeaveBasicObject: function(wbo, collection) {
+    weave.util.Log.debug("WeaveClient.encryptWeaveBasicObject()");
+	return this.cryptoClient.encryptWeaveBasicObject(wbo, collection);
+  }
+
 
 };
 
 module.exports = baseClient;
 
 
-},{"./weave-crypto":4,"./weave-error":5,"./weave-storage":7,"./weave-util":8,"p-promise":16}],4:[function(require,module,exports){
+},{"./weave-crypto":4,"./weave-error":5,"./weave-storage":7,"./weave-util":8,"p-promise":16,"sprintf":18}],4:[function(require,module,exports){
 (function (global){
 /*
  * Copyright 2014 Gerry Healy <nickel_chrome@mac.com>
@@ -928,7 +1022,26 @@ crypto.CryptoClient.prototype = {
         return P(decWbo);
       });
   },
-  
+
+  encryptWeaveBasicObject: function(decWbo, collection) {
+    weave.util.Log.debug("CryptoClient.encryptWeaveBasicObject()");
+
+	if ( this.isEncrypted(decWbo) ) {
+	  throw new weave.error.WeaveError("Weave Basic Object already encrypted");
+	}
+
+    return this.encrypt(decWbo.payload, collection)
+      .then(function(payload) {
+        var encWbo = new weave.storage.WeaveBasicObject();
+	    encWbo.id         = decWbo.id
+	    encWbo.modified   = decWbo.modified;
+	    encWbo.sortindex  = decWbo.sortindex;
+	    encWbo.payload    = payload;
+	    encWbo.ttl        = decWbo.ttl;
+        return P(encWbo);
+      });
+  },
+
   decrypt: function(payload, collection) {
     weave.util.Log.debug("CryptoClient.decrypt()");
     
@@ -955,7 +1068,34 @@ crypto.CryptoClient.prototype = {
         });
     }
   },
-  
+
+  encrypt: function(payload, collection) {
+    weave.util.Log.debug("CryptoClient.encrypt()");
+    
+    var keyPair = new crypto.WeaveKeyPair();
+    
+    if ( collection === null ) {
+      weave.util.Log.info("Encrypting data record using sync key");
+      
+      try {
+        keyPair = this.privateKey;
+      } catch(e){
+        throw new weave.error.WeaveError(e.message);
+      }
+
+      var ciphertext = crypto.PayloadCipher.encrypt(payload, keyPair);
+      return P(ciphertext);
+    } else {
+      weave.util.Log.info(sprintf("Encrypting data record using bulk key %s", collection));
+      
+      return this.getBulkKeyPair(collection)
+        .then(function(keyPair) {
+          var ciphertext = crypto.PayloadCipher.encrypt(payload, keyPair);
+          return P(ciphertext);
+        });
+    }
+  },
+
   /**
    * Given a bulk key label, pull the key down from the network,
    * and decrypt it using my private key.  Then store the key
@@ -1081,7 +1221,7 @@ crypto.PayloadCipher = function() {
       cipher.start({iv: iv});
       cipher.update(forge.util.createBuffer(cipherbytes));
       cipher.finish();
-      cleartext = cipher.output;
+      cleartext = cipher.output.toString();
 
       weave.util.Log.debug(sprintf("cleartext: %s", cleartext));
       
@@ -1108,9 +1248,9 @@ crypto.PayloadCipher = function() {
 	
 	// Encryption primitives
     var ciphertext  = null;
-    var cipherbytes = new array();
-    var iv          = new array();
-    var hmac        = new array();
+    var cipherbytes = null;
+    var iv          = null;
+    var hmac        = null;
     
     // 1. Encrypt plaintext
     // Note: this is the same as this operation at the openssl command line:
@@ -1125,19 +1265,23 @@ crypto.PayloadCipher = function() {
       cipher.finish();
       cipherbytes = cipher.output;
       
+      weave.util.Log.debug("ciphertext (hex): " + cipherbytes.toHex());
+    
     } catch (e) {
 	  throw new weave.error.WeaveError(e);
     }
     
     // 2. Create hmac of ciphertext
     // Note: HMAC is done against base64 encoded ciphertext
-    ciphertext = weave.util.Base64.encode(cipherbytes);
-    
+    ciphertext = weave.util.Base64.encode(cipherbytes.bytes());
+
+    weave.util.Log.debug("ciphertext (base64): " + ciphertext);
+
     try {
       var hmacSHA256 = forge.hmac.create();
       hmacSHA256.start('sha256', keyPair.hmacKey.bytes());
       hmacSHA256.update(ciphertext);
-      hmac = hmac256.digest().toHex();
+      hmac = hmacSHA256.digest();
       
 	} catch (e) {
 	  throw new weave.error.WeaveError(e);
@@ -1512,13 +1656,90 @@ weave.net.HttpClient = function(xhr, options) {
 };
 weave.net.HttpClient.prototype = {
 
+  'DEFAULT_TIMEOUT': 5000,
+  
   setAuthProvider: function(provider) {
     this.authProvider = provider;
+  },
+  
+  get: function(url, timeout, headers) {
+    weave.util.Log.debug("HttpClient.get()");
+
+    var xhr = new this.xhr();
+      
+    xhr.open('GET', url, false);  // synchronous request
+    xhr.timeout = timeout;
+    
+    if ( this.authProvider !== null ) {
+      this.authProvider.setAuthHeader(xhr, url, 'GET');
+    }
+
+    if ( headers !== undefined ) {
+      for (var key in headers) {
+        xhr.setRequestHeader(key, headers[key]);
+      }
+    }
+
+    xhr.send(null);
+    
+    if (xhr.status != 200) {
+      throw new weave.error.WeaveError("Http request failed - " + xhr.status + " - " + xhr.statusText);
+    }
+
+	return xhr.responseText;
+  },    
+
+  asyncRequest: function(method, url, timeout, headers, data) {
+    weave.util.Log.debug("HttpClient.asyncRequest()");
+
+    //defaults
+    timeout = (typeof timeout !== 'undefined' ? timeout : this.DEFAULT_TIMEOUT);
+    headers = (typeof headers !== 'undefined' ? headers : {});
+    data = (typeof data !== 'undefined' ? data : null);
+    
+    var xhr = new this.xhr();
+
+    var deferred = P.defer();
+
+    xhr.ontimeout = function () {
+      deferred.reject("Http " + method + " request for " + url + " timed out.");
+    };
+      
+    xhr.onload = function() {
+      if (xhr.readyState !== 4) {
+        return;
+      }
+      
+      if (xhr.status !== 200) {
+        weave.util.Log.debug("Http " + method + " request for " + url + " failed. " + xhr.status + " - " + xhr.statusText);
+        deferred.reject(xhr.status + " " + xhr.statusText);
+      }
+
+      deferred.resolve(xhr.responseText);
+    };
+    
+    xhr.open(method, url, true);
+    xhr.timeout = timeout;
+    
+    if ( this.authProvider !== null ) {
+      this.authProvider.setAuthHeader(xhr, url, method);
+    }
+
+    for (var key in headers) {
+      xhr.setRequestHeader(key, headers[key]);
+    }
+
+    xhr.send(data);
+
+    return deferred.promise;
   },
 
   asyncGet: function(url, timeout, headers) {
     weave.util.Log.debug("HttpClient.asyncGet()");
 
+    return this.asyncRequest('GET', url, timeout, headers);
+    
+    /*
     var xhr = new this.xhr();
 
     var deferred = P.defer();
@@ -1557,18 +1778,42 @@ weave.net.HttpClient.prototype = {
     xhr.send(null);
 
     return deferred.promise;
+    */
   },
-  
-  get: function(url, timeout, headers) {
-    weave.util.Log.debug("HttpClient.get()");
 
+  asyncPut: function(url, timeout, headers, data) {
+    weave.util.Log.debug("HttpClient.asyncPut()");
+
+    return this.asyncRequest('PUT', url, timeout, headers, data);
+    
+    /*
     var xhr = new this.xhr();
+
+    var deferred = P.defer();
+    
+    xhr.ontimeout = function () {
+      //throw new weave.error.WeaveError("Http request for " + url + " timed out.");
+      deferred.reject("Http request for " + url + " timed out.");
+    };
       
-    xhr.open('GET', url, false);  // synchronous request
+    xhr.onload = function() {
+      if (xhr.readyState !== 4) {
+        return;
+      }
+      
+      if (xhr.status !== 200) {
+        //throw new weave.error.WeaveError("Http request for " + url + " failed. " + xhr.status + " - " + xhr.statusText);
+        deferred.reject("Http request for " + url + " failed. " + xhr.status + " - " + xhr.statusText);
+      }
+
+      deferred.resolve(xhr.responseText);
+    };
+    
+    xhr.open("PUT", url, true);
     xhr.timeout = timeout;
     
     if ( this.authProvider !== null ) {
-      this.authProvider.setAuthHeader(xhr, url, 'GET');
+      this.authProvider.setAuthHeader(xhr, url, 'PUT');
     }
 
     if ( headers !== undefined ) {
@@ -1577,14 +1822,18 @@ weave.net.HttpClient.prototype = {
       }
     }
 
-    xhr.send(null);
-    
-    if (xhr.status != 200) {
-      throw new weave.error.WeaveError("Http request failed - " + xhr.status + " - " + xhr.statusText);
-    }
+    xhr.send(data);
 
-	return xhr.responseText;
-  }    
+    return deferred.promise;
+    */
+  },
+
+  asyncDelete: function(url, timeout, headers) {
+    weave.util.Log.debug("HttpClient.asyncDelete()");
+
+    return this.asyncRequest('DELETE', url, timeout, headers);
+  }
+
 };
 
 weave.net.BasicAuthProvider = function(auth) {
@@ -1711,7 +1960,7 @@ storage.WeaveBasicObject = function() {
 
 storage.WeaveBasicObject.prototype = {
   getPayloadAsJSONObject: function() {
-    weave.util.Log.debug("storage.WeaveBasicObject.getPayloadAsJSONObject()");
+    weave.util.Log.debug("WeaveBasicObject.getPayloadAsJSONObject()");
     return JSON.parse(this.payload);
   },
 
@@ -1721,6 +1970,16 @@ storage.WeaveBasicObject.prototype = {
     this.sortindex = jsonObject.sortindex;
     this.ttl       = jsonObject.ttl;
     this.payload   = jsonObject.payload;
+  },
+
+  toJSONObject: function() {
+    return {
+      id:        this.id,
+      modified:  this.modified,
+      sortindex: this.sortindex,
+      ttl:       this.ttl,
+      payload:   this.payload
+    };
   }
 };
 
@@ -1755,7 +2014,7 @@ storage.StorageClient.prototype = {
 
     var url = this.buildStorageUri(path);
     
-    return this.httpClient.asyncGet(url, 2000)
+    return this.httpClient.asyncGet(url)
       .then(function(response) {
         var jsonObject = JSON.parse(response);
         var wbo        = new storage.WeaveBasicObject();
@@ -1768,8 +2027,13 @@ storage.StorageClient.prototype = {
       });
   },
 
-  buildStorageUri: function(path) {
-    return URI("storage/" + path).absoluteTo(this.storageURL).toString();
+  buildStorageUri: function(path, root) {
+    root = (typeof root !== 'undefined' ? root : false);
+    if (root) {
+      return URI(path).absoluteTo(this.storageURL).toString();
+    } else {
+      return URI("storage/" + path).absoluteTo(this.storageURL).toString();
+    }
   },
     
   buildCollectionUri: function(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, full) {
@@ -1821,7 +2085,7 @@ storage.StorageClient.prototype = {
 
 	var url = this.buildCollectionUri(collection, ids, older, newer, index_above, index_below, limit, offset, sort, null, false);
 
-    return this.httpClient.asyncGet(url, 2000)
+    return this.httpClient.asyncGet(url)
       .then(function(response) {
         var ids = JSON.parse(response);
         return P(ids);
@@ -1837,7 +2101,7 @@ storage.StorageClient.prototype = {
 
 	var url = this.buildCollectionUri(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, true);
 
-    return this.httpClient.asyncGet(url, 2000)
+    return this.httpClient.asyncGet(url)
       .then(function(response) {
         var jsonArray = JSON.parse(response);
         
@@ -1854,7 +2118,123 @@ storage.StorageClient.prototype = {
         weave.util.Log.error("Couldn't get weave collection - " + error);
         return P.reject(error);
       });
-  }  
+  },
+
+  put: function(collection, id, wbo) {
+	weave.util.Log.debug("StorageClient.put()");
+
+    var self = this;
+    
+    var path = collection + "/" + id;
+    var url = this.buildStorageUri(path);
+    var data = JSON.stringify(wbo.toJSONObject());
+        
+    return this.httpClient.asyncPut(url, undefined, undefined, data)
+      .then(function(response) {
+        //First try to parse response as JSON otherwise treat as raw modified value
+        var modified = null;
+        var jsonObject = JSON.parse(response);
+        if (typeof jsonObject === 'object' && jsonObject.modified) {
+          modified = jsonObject.modified;
+        } else {
+          modified = parseFloat(response);
+        }
+        return P(modified);
+      })
+      .fail(function(error) {
+        weave.util.Log.error("Couldn't put weave item - " + error);
+        return P.reject(error);
+      });
+  },
+
+  delete: function(collection, id) {
+	weave.util.Log.debug("StorageClient.delete()");
+
+    var self = this;
+    
+    var path = collection + "/" + id;
+    var url = this.buildStorageUri(path);
+        
+    return this.httpClient.asyncDelete(url)
+      .then(function(response) {
+        //First try to parse response as JSON otherwise treat as raw modified value
+        var modified = null;
+        var jsonObject = JSON.parse(response);
+        if (typeof jsonObject === 'object' && jsonObject.modified) {
+          modified = jsonObject.modified;
+        } else {
+          modified = parseFloat(response);
+        }
+        return P(modified);
+      })
+      .fail(function(error) {
+        weave.util.Log.error("Couldn't delete weave item - " + error);
+        return P.reject(error);
+      });
+  },
+
+  getInfoCollections: function(getcount, getusage) {
+	weave.util.Log.debug("StorageClient.getInfoCollections()");
+
+    var self = this;
+    
+    var url = this.buildStorageUri("info/collections", true);
+    return this.httpClient.asyncGet(url)
+      .then(function(response) {
+        var colModified = JSON.parse(response);
+        var cols = {};
+        for (var col in colModified) {
+          if (!cols[col]) {
+            cols[col] = {};
+          }
+          cols[col].modified = colModified[col];
+        }
+        return P(cols);
+      })
+      .then(function(cols) {
+		//Optionally get info/collection_counts
+		if ( getcount ) {
+          var url = self.buildStorageUri("info/collection_counts", true);
+          return self.httpClient.asyncGet(url)
+            .then(function(response) {
+	          var colCounts = JSON.parse(response);
+              for (var col in colCounts) {
+                if (!cols[col]) {
+                  cols[col] = {};
+                }
+                cols[col].count = colCounts[col];
+              }
+              return P(cols);
+			})
+		} else {
+          return P(cols);
+        }
+	  })
+      .then(function(cols) {
+		//Optionally get info/collection_usage
+		if ( getusage ) {
+          var url = self.buildStorageUri("info/collection_usage", true);
+          return self.httpClient.asyncGet(url)
+            .then(function(response) {
+	          var colUsage = JSON.parse(response);
+              for (var col in colUsage) {
+                if (!cols[col]) {
+                  cols[col] = {};
+                }
+                cols[col].usage = colUsage[col];
+              }
+              return P(cols);
+			})
+		} else {
+          return P(cols);
+        }		
+      })
+      .fail(function(error) {
+        weave.util.Log.error("Couldn't get weave item - " + error);
+        return P.reject(error);
+      });
+  }
+
 };
 
 storage.StorageClientV1_1 = function() {

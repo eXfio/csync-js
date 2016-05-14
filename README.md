@@ -4,8 +4,8 @@ weaveclient-js
 Weave Sync/Firefox Sync client library written in JavaScript.
 
 ## Features
-* Compatible with Weave Sync v5 (pre Firefox 29)
-* Decrypt data stored on Weave Sync server (read only)
+* Compatible with Weave Sync Storage API v1.1 (pre Firefox v29) and v1.5 (FxA)
+* Encrypt/Decrypt data stored on Weave Sync server (read and write)
 * Commandline client
 
 ## Node
