@@ -1,26 +1,33 @@
-weaveclient-js
+cucumbersync-js
 ==============
 
-Weave Sync/Firefox Sync client library written in JavaScript.
+Cucumber Sync client library written in JavaScript.
+
+Cucumber Sync implements Weave Sync/Firefox Sync crypto version 5 and supports a number of account and storage backends
 
 ## Features
-* Compatible with Weave Sync Storage API v1.1 (pre Firefox v29) and v1.5 (FxA)
-* Encrypt/Decrypt data stored on Weave Sync server (read and write)
+* Account and storage backends:
+  * Firefox Account (FxA) with Storage API v1.5
+  * Weave Sync Account v1.0 with Storage API v1.1 (pre Firefox v29)
+* Encrypt/Decrypt data (read and write)
 * Commandline client
+
+## Roadmap
+* Support for Google Firebase accounts and storage
 
 ## Node
 
 ### Installation
 ```
-npm install weaveclient
+npm install cucumbersync
 ```
 
 ### Basic Usage
 
 ```javascript
-var weave = require('weaveclient');
+var weave = require('cucumbersync');
 
-var baseURL  = "http://server/path/to/weave";
+var baseURL  = "http://server/path/to/csync";
 var user     = "username";
 var password = "really long password";
 var synckey  = "CBGMDB56ISI5KVQWDIUB2K54HQ"; //Base32 encoded sync key
